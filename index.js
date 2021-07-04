@@ -1,52 +1,48 @@
-#!/usr/bin/env node
-var WebSocketServer = require('websocket').server;
-var http = require('http');
+'use strict'
 
-var server = http.createServer(function(request, response) {
-    console.log((new Date()) + ' Received request for ' + request.url);
-    response.writeHead(404);
-    response.end();
-});
-server.listen(8080, function() {
-    console.log((new Date()) + ' Server is listening on port 8080');
-});
+const WebSocket = require('ws').Server,
+      express = require('express'),
+      app = express(),
+      morgan = require('morgan'),
+      path = require('path')
 
-wsServer = new WebSocketServer({
-    httpServer: server,
-    // You should not use autoAcceptConnections for production
-    // applications, as it defeats all standard cross-origin protection
-    // facilities built into the protocol and the browser.  You should
-    // *always* verify the connection's origin and decide whether or not
-    // to accept it.
-    autoAcceptConnections: false
-});
+const wss = new WebSocket({port:8080});
 
-function originIsAllowed(origin) {
-  // put logic here to detect whether the specified origin is allowed.
-  return true;
+wss.on('connection',function connection(ws){
+   ws.on('message',function(message){
+       wss.broadcast(message)
+   }) 
+})
+
+
+wss.broadcast = function broadcast(msg){
+    wss.clients.forEach((client)=>{
+        client.send(msg);
+    })
 }
 
-wsServer.on('request', function(request) {
-    if (!originIsAllowed(request.origin)) {
-      // Make sure we only accept requests from an allowed origin
-      request.reject();
-      console.log((new Date()) + ' Connection from origin ' + request.origin + ' rejected.');
-      return;
-    }
-    
-    var connection = request.accept('echo-protocol', request.origin);
-    console.log((new Date()) + ' Connection accepted.');
-    connection.on('message', function(message) {
-        if (message.type === 'utf8') {
-            console.log('Received Message: ' + message.utf8Data);
-            connection.sendUTF(message.utf8Data);
-        }
-        else if (message.type === 'binary') {
-            console.log('Received Binary Message of ' + message.binaryData.length + ' bytes');
-            connection.sendBytes(message.binaryData);
-        }
-    });
-    connection.on('close', function(reasonCode, description) {
-        console.log((new Date()) + ' Peer ' + connection.remoteAddress + ' disconnected.');
-    });
-});
+
+setInterval(()=>{
+    wss.clients.forEach((client)=>{
+        client.send("Envia tu valor del sensor aca!!!!");
+    })
+
+    console.log("data was send sucefully!!!")
+},1000)
+
+app.set('port',8000);
+
+app.use(express.static("public"));
+
+app.use(express.static(__dirname ));
+
+app.use(morgan('dev'));
+
+app.get('/',(req,res)=>{
+    res.sendFile(`${__dirname}/index.html`);
+})
+
+
+app.listen(app.get('port'),()=>{
+    console.log('SERVER RUN ON',app.get('port'))
+})
